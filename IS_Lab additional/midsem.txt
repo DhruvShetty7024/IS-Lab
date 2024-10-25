@@ -1,0 +1,176 @@
+Python Application for Secure Communication of Medical Data
+
+The goal of this application is to enable secure communication between healthcare professionals (nurses, senior doctors, and lab technicians) using encryption, digital signatures, and hashing.
+
+Module 1: Nurse - Data Entry and Encryption
+
+The nurse will be responsible for entering patient details (e.g., name, age, height, etc.). The patient’s information will be encrypted using the ElGamal encryption algorithm to ensure data confidentiality. In addition to encryption, a digital signature will be created using either RSA or ECDSA to guarantee data integrity and authenticity.
+
+	1.	Nurse’s Tasks:
+	•	Enter patient details (e.g., name, age, height).
+	•	Encrypt patient data using ElGamal.
+	•	Sign the encrypted data using RSA or ECDSA.
+	•	Send the encrypted data and the digital signature to the senior doctor.
+
+Module 2: Senior Doctor - Data Decryption and Verification
+
+The senior doctor can request access to the encrypted patient information, along with the digital signature, for further analysis. The system will verify the validity of the signature using the doctor’s public key. Once the signature is verified, the encrypted data will be decrypted and made available to the doctor. The senior doctor can then suggest further medical tests and send the request to the lab technician.
+
+	1.	Senior Doctor’s Tasks:
+	•	Request encrypted patient info and the corresponding signature.
+	•	Verify the signature using RSA/ECDSA public key.
+	•	If the signature is valid, decrypt the patient data.
+	•	Suggest further tests and send the request to the lab technician.
+
+Module 3: Lab Technician - Test Results and Hashing
+
+The lab technician receives the doctor’s test request and processes the required tests. Once the results are ready, the results are hashed using SHA-256 to ensure data integrity. The hashed test results are then sent back to the senior doctor, who can verify them for accuracy before proceeding with further analysis or recommendations.
+
+	1.	Lab Technician’s Tasks:
+	•	Receive the test request from the senior doctor.
+	•	Process the test and generate the results.
+	•	Hash the test results using SHA-256.
+	•	Send the hashed test results back to the senior doctor.
+
+Technical Requirements
+
+	•	Encryption: ElGamal for encrypting sensitive patient information.
+	•	Digital Signatures: RSA or ECDSA for ensuring data integrity and authenticity.
+	•	Hashing: SHA-256 for hashing lab test results.
+	•	Key Management: Public-private key pairs for encryption and digital signatures must be securely generated and distributed.
+
+Sample Flow:
+
+	1.	Nurse:
+	•	Enters patient details.
+	•	Encrypts the details using ElGamal.
+	•	Signs the encrypted data using RSA or ECDSA.
+	•	Sends both the encrypted data and signature to the senior doctor.
+	2.	Senior Doctor:
+	•	Requests encrypted data and signature.
+	•	Verifies the signature.
+	•	Decrypts the data if the signature is valid.
+	•	Sends a test request to the lab technician.
+	3.	Lab Technician:
+	•	Receives the test request.
+	•	Processes the tests and hashes the results.
+	•	Sends the hashed results back to the senior doctor.
+
+This secure communication system ensures that patient information is kept confidential, the integrity of the data is maintained, and test results can be verified securely.
+import random
+import hashlib
+import rsa
+from Crypto.Util.number import getPrime, inverse
+
+# ElGamal Encryption Class
+class ElGamal:
+    def __init__(self):
+        self.p = getPrime(512)  # Prime number
+        self.g = random.randint(2, self.p - 1)  # Generator
+        self.x = random.randint(1, self.p - 2)  # Private key
+        self.y = pow(self.g, self.x, self.p)  # Public key
+
+    def encrypt(self, plaintext):
+        k = random.randint(1, self.p - 2)  # Random integer
+        c1 = pow(self.g, k, self.p)  # c1 = g^k mod p
+        c2 = (plaintext * pow(self.y, k, self.p)) % self.p  # c2 = m * y^k mod p
+        return (c1, c2)
+
+    def decrypt(self, ciphertext):
+        c1, c2 = ciphertext
+        s = pow(c1, self.x, self.p)  # s = c1^x mod p
+        plaintext = (c2 * inverse(s, self.p)) % self.p  # m = c2 / s mod p
+        return plaintext
+
+# Digital Signature Class
+class DigitalSignature:
+    def __init__(self, method='RSA'):
+        self.method = method
+        if self.method == 'RSA':
+            self.private_key, self.public_key = rsa.newkeys(512)  # Generate RSA keys
+
+    def sign(self, message):
+        if self.method == 'RSA':
+            return rsa.sign(message.encode(), self.private_key, 'SHA-256')
+
+    def verify(self, message, signature):
+        if self.method == 'RSA':
+            try:
+                rsa.verify(message.encode(), signature, self.public_key)
+                return True
+            except rsa.VerificationError:
+                return False
+
+# Function to simulate nurse's tasks
+def nurse_module():
+    print("\n=== Nurse Module ===")
+    name = input("Enter patient's name: ")
+    age = input("Enter patient's age: ")
+    height = input("Enter patient's height: ")
+    
+    patient_info = f"{name},{age},{height}"
+    print(f"Patient info entered: {patient_info}")
+
+    elgamal = ElGamal()
+    encrypted_data = elgamal.encrypt(int(hashlib.sha256(patient_info.encode()).hexdigest(), 16))
+    print(f"Encrypted patient data: {encrypted_data}")
+
+    signer = DigitalSignature(method='RSA')
+    signature = signer.sign(patient_info)
+    print(f"Digital signature: {signature.hex()}")
+
+    return encrypted_data, signature, elgamal
+
+# Function to simulate senior doctor's tasks
+def senior_doctor_module(elgamal, encrypted_data, signature):
+    print("\n=== Senior Doctor Module ===")
+    verification_result = DigitalSignature(method='RSA').verify(str(encrypted_data), signature)
+    if verification_result:
+        print("Signature is valid. Decrypting patient data...")
+        decrypted_data = elgamal.decrypt(encrypted_data)
+        print(f"Decrypted patient data (hash): {decrypted_data}")
+        return decrypted_data
+    else:
+        print("Signature verification failed. Cannot decrypt data.")
+        return None
+
+# Function to simulate lab technician's tasks
+def lab_technician_module():
+    print("\n=== Lab Technician Module ===")
+    test_results = input("Enter test results: ")
+    hashed_results = hashlib.sha256(test_results.encode()).hexdigest()
+    print(f"Hashed test results: {hashed_results}")
+    return hashed_results
+
+# Main function to control the flow of the application
+def main():
+    elgamal = None
+    encrypted_data = None
+    signature = None
+
+    while True:
+        print("\n=== Secure Medical Data Communication System ===")
+        print("1. Nurse Module")
+        print("2. Senior Doctor Module")
+        print("3. Lab Technician Module")
+        print("4. Exit")
+
+        choice = input("Choose an option (1/2/3/4): ")
+
+        if choice == '1':
+            elgamal, encrypted_data, signature = nurse_module()
+        elif choice == '2':
+            if elgamal and encrypted_data and signature:
+                senior_doctor_module(elgamal, encrypted_data, signature)
+            else:
+                print("No encrypted data available. Please run the Nurse Module first.")
+        elif choice == '3':
+            lab_technician_module()
+        elif choice == '4':
+            print("Exiting the application.")
+            break
+        else:
+            print("Invalid choice. Please select again.")
+
+if __name__ == "__main__":
+    main()
